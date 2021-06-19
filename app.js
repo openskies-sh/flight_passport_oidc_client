@@ -5,7 +5,8 @@ var cookieParser = require('cookie-parser');
 var session = require('express-session');
 var dotenv = require('dotenv');
 var passport = require('passport');
-var OpenIDStrategy = require('passport-openid');
+
+var openid_connect = require('passport-openidconnect');
 var flash = require('connect-flash');
 var userInViews = require('./lib/middleware/userInViews');
 var authRouter = require('./routes/auth');
@@ -14,33 +15,37 @@ var usersRouter = require('./routes/users');
 
 dotenv.config();
 
-let strategy = new OpenIDStrategy({
-  returnURL: process.env.CALLBACK_URL,
-  realm:process.env.OAUTH_DOMAIN,
-  passReqToCallback: true,
+let strategy = new openid_connect({
+  issuer: process.env.OAUTH_DOMAIN,
+  clientID: process.env.OAUTH_CLIENT_ID,
+  authorizationURL: process.env.AUTHORIZATION_URL, 
+  clientSecret: process.env.OAUTH_CLIENT_SECRET,
+  redirect_uri: process.env.CALLBACK_URL,
+  userInfoURL:process.env.USER_INFO_URL,
+  tokenURL: process.env.TOKEN_URL,
+  scope: 'openid profile'
 },
-  function (accessToken, refreshToken, params,userProfile, cb) {
-    return cb(null, userProfile);
-  }
-);
+function (identifier, userProfile, done) {
+  return done(null, userProfile)
+});
 
-strategy.userProfile = function (accesstoken, done) {
-  // choose your own adventure, or use the Strategy's oauth client
-  const headers = {
-    'User-Agent': 'request',
-    'Authorization': 'Bearer ' + accesstoken,
-  };
-  this._oauth2._request("GET", process.env.USER_INFO_URL, headers, null, null, (err, data) => {
-    if (err) { return done(err); }
-    try {
-      data = JSON.parse(data);
-    }
-    catch (e) {
-      return done(e);
-    }
-    done(null, data);
-  });
-};
+// strategy.userProfile = function (accesstoken, done) {
+//   // choose your own adventure, or use the Strategy's oauth client
+//   const headers = {
+//     'User-Agent': 'request',
+//     'Authorization': 'Bearer ' + accesstoken,
+//   };
+//   this._oauth2._request("GET", process.env.USER_INFO_URL, headers, null, null, (err, data) => {
+//     if (err) { return done(err); }
+//     try {
+//       data = JSON.parse(data);
+//     }
+//     catch (e) {
+//       return done(e);
+//     }
+//     done(null, data);
+//   });
+// };
 
 
 passport.use(strategy);

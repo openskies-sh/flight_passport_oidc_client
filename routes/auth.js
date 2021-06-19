@@ -9,7 +9,7 @@ var querystring = require('querystring');
 dotenv.config();
 
 // Perform the login, after login Auth0 will redirect to callback
-router.get('/login', passport.authenticate('oidc', {
+router.get('/login', passport.authenticate('openidconnect', {
   session: true,
   scope: ''
 }), function (req, res) {
@@ -18,7 +18,7 @@ router.get('/login', passport.authenticate('oidc', {
 
 // Perform the final stage of authentication and redirect to previously requested URL or '/user'
 router.get('/callback', function (req, res, next) {
-  passport.authenticate('oauth2', function (err, user, info) {
+  passport.authenticate('openidconnect', function (err, user, info) {
     if (err) { return next(err); }
     if (!user) { return res.redirect('/login'); }
     req.logIn(user, function (err) {
