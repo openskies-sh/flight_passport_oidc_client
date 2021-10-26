@@ -33,117 +33,76 @@ Issuer.discover(process.env.OIDC_DOMAIN).then(passport_issuer => {
     response_types: ["code"]
   });
 
-    app.use(
-      expressSesssion({
-        secret: 'keyboard cat',
-        resave: false,
-        saveUninitialized: true
-      })
-    );
+  app.use(
+    expressSesssion({
+      secret: 'keyboard cat',
+      resave: false,
+      saveUninitialized: true
+    })
+  );
 
-    app.use(passport.initialize());
-    app.use(passport.session());
-    app.use(flash());
-    passport.use(
-      'oidc',
-      new Strategy({ client }, (tokenSet, userinfo, done) => {
-        return done(null, tokenSet.claims());
-      })
-    );
+  app.use(passport.initialize());
+  app.use(passport.session());
+  app.use(flash());
+  passport.use(
+    'oidc',
+    new Strategy({ client }, (tokenSet, userinfo, done) => {
+      return done(null, tokenSet.claims());
+    })
+  );
 
-    // handles serialization and deserialization of authenticated user
-    passport.serializeUser(function(user, done) {
-      done(null, user);
-    });
-    passport.deserializeUser(function(user, done) {
-      done(null, user);
-    });
-
-    // start authentication request
-    app.get('/auth', function(req, res, next) {
-      passport.authenticate('oidc', function(err, user, info) {
-        console.log(user)
-        console.log(info)
-        if (err) {
-          return next(err); // will generate a 500 error
-        }
-        // Generate a JSON response reflecting authentication status
-        if (! user) {
-          return res.send({ success : false, message : 'authentication failed' });
-        }
-        // ***********************************************************************
-        // "Note that when using a custom callback, it becomes the application's
-        // responsibility to establish a session (by calling req.login()) and send
-        // a response."
-        // Source: http://passportjs.org/docs
-        // ***********************************************************************
-        req.login(user, loginErr => {
-          if (loginErr) {
-            return next(loginErr);
-          }
-          return res.send({ success : true, message : 'authentication succeeded' });
-        });      
-      })(req, res, next);
-    });
-
-    // authentication callback
-    app.get('/auth/callback', (req, res, next) => {
-      passport.authenticate('oidc',  function(err, user, info) {
-        console.log(user)
-        console.log(info)
-        if (err) {
-          return next(err); // will generate a 500 error
-        }
-        // Generate a JSON response reflecting authentication status
-        if (! user) {
-          return res.send({ success : false, message : 'authentication failed' });
-        }
-        // ***********************************************************************
-        // "Note that when using a custom callback, it becomes the application's
-        // responsibility to establish a session (by calling req.login()) and send
-        // a response."
-        // Source: http://passportjs.org/docs
-        // ***********************************************************************
-        req.login(user, loginErr => {
-          if (loginErr) {
-            return next(loginErr);
-          }
-          return res.send({ success : true, message : 'authentication succeeded' });
-        });      
-      })(req, res, next);
-    });
-
-    app.use('/users', usersRouter);
-
-    // start logout request
-    app.get('/logout', (req, res) => {
-      res.redirect(client.endSessionUrl());
-    });
-
-    // logout callback
-    app.get('/logout/callback', (req, res) => {
-      // clears the persisted user from the local storage
-      req.logout();
-      // redirects the user to a public route
-      res.redirect('/');
-    });
-
-
-    // catch 404 and forward to error handler
-    app.use(function(req, res, next) {
-      next(createError(404));
-    });
-
-    // error handler
-    app.use(function(err, req, res, next) {
-      // set locals, only providing error in development
-      res.locals.message = err.message;
-      res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-      // render the error page
-      res.status(err.status || 500);
-      res.render('error');
-    });
+  // handles serialization and deserialization of authenticated user
+  passport.serializeUser(function (user, done) {
+    done(null, user);
   });
+  passport.deserializeUser(function (user, done) {
+    done(null, user);
+  });
+
+  // start authentication request
+  app.get('/auth', function (req, res, next) {
+    passport.authenticate('oidc')(req, res, next);
+  });
+
+  // authentication callback
+  app.get('/auth/callback', (req, res, next) => {
+    passport.authenticate('oidc', {
+      successRedirect: '/users',
+      failureRedirect: '/'
+    })(req, res, next);
+  });
+
+  app.use('/users', usersRouter);
+
+  // start logout request
+  app.get('/logout', (req, res) => {
+    res.redirect(client.endSessionUrl());
+  });
+
+  // logout callback
+  app.get('/logout/callback', (req, res) => {
+    // clears the persisted user from the local storage
+    req.logout();
+    // redirects the user to a public route
+    res.redirect('/');
+  });
+
+
+  // catch 404 and forward to error handler
+  app.use(function (req, res, next) {
+    next(createError(404));
+  });
+
+  // error handler
+  app.use(function (err, req, res, next) {
+    // set locals, only providing error in development
+    res.locals.message = err.message;
+    res.locals.error = req.app.get('env') === 'development' ? err : {};
+
+    // render the error page
+    res.status(err.status || 500);
+    res.render('error');
+  });
+});
 
 module.exports = app;
