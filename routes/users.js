@@ -1,16 +1,9 @@
-var express = require('express');
-var secured = require('../lib/middleware/secured');
-var router = express.Router();
+const express = require('express');
+const router = express.Router();
+const ensureLoggedIn = require('connect-ensure-login').ensureLoggedIn;
 
-
-/* GET user profile. */
-router.get('/user', secured(), function (req, res, next) {
-  const { _raw, _json, ...userProfile } = req.user;
-  res.render('user', {
-    'userProfile': userProfile,
-    'userProfile_pretty': JSON.stringify(userProfile, null, 2),    
-    title: 'Profile page'
-  });
+router.get('/', ensureLoggedIn('/'), (req, res) => {
+  res.render('users', { user: req.user });
 });
 
 module.exports = router;

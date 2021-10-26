@@ -1,18 +1,18 @@
-.w3-container a {
-    color: #337ab7;
-    text-decoration: none;
+body {
+  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
 }
 
-pre {
-    text-align: left;
-    font-family: 'Courier New', Courier, monospace;
-    background-color: #343f5f;
-    color: #fdfeff;
-    overflow: scroll;
-    border: 1px #929090 solid;
-    padding: 15px
+a {
+  color: #00B7FF;
 }
 
-.w3-card-4 {
-    padding: 15px;
+.content {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: rgb(99, 99, 99);
+  padding-bottom: 5em;
 }

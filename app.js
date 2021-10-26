@@ -1,147 +1,149 @@
+var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
-var logger = require('morgan');
 var cookieParser = require('cookie-parser');
-var session = require('express-session');
-var dotenv = require('dotenv');
-var passport = require('passport');
+var logger = require('morgan');
+const expressSesssion = require('express-session');
+const passport = require('passport');
+const { Issuer, Strategy } = require('openid-client');
 
-var openid_connect = require('passport-openidconnect');
-var flash = require('connect-flash');
-var userInViews = require('./lib/middleware/userInViews');
-var authRouter = require('./routes/auth');
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
+require('dotenv').config();
+var flash = require('connect-flash');
+var app = express();
 
-dotenv.config();
-
-let strategy = new openid_connect({
-  issuer: process.env.OAUTH_DOMAIN,
-  clientID: process.env.OAUTH_CLIENT_ID,
-  authorizationURL: process.env.AUTHORIZATION_URL, 
-  clientSecret: process.env.OAUTH_CLIENT_SECRET,
-  redirect_uri: process.env.CALLBACK_URL,
-  userInfoURL:process.env.USER_INFO_URL,
-  tokenURL: process.env.TOKEN_URL,
-  scope: 'openid profile'
-},
-function (identifier, userProfile, done) {
-  return done(null, userProfile)
-});
-
-// strategy.userProfile = function (accesstoken, done) {
-//   // choose your own adventure, or use the Strategy's oauth client
-//   const headers = {
-//     'User-Agent': 'request',
-//     'Authorization': 'Bearer ' + accesstoken,
-//   };
-//   this._oauth2._request("GET", process.env.USER_INFO_URL, headers, null, null, (err, data) => {
-//     if (err) { return done(err); }
-//     try {
-//       data = JSON.parse(data);
-//     }
-//     catch (e) {
-//       return done(e);
-//     }
-//     done(null, data);
-//   });
-// };
-
-
-passport.use(strategy);
-
-// You can use this section to keep a smaller payload
-passport.serializeUser(function (user, done) {
-  done(null, user);
-});
-
-passport.deserializeUser(function (user, done) {
-  done(null, user);
-});
-
-const app = express();
-
-// View engine setup
+// view engine setup
 app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'pug');
+app.set('view engine', 'ejs');
 
 app.use(logger('dev'));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-
-// config express-session
-var sess = {
-  secret: 'CHANGE THIS SECRET',
-  cookie: {},
-  resave: false,
-  saveUninitialized: true
-};
-
-if (app.get('env') === 'production') {
-  // If you are using a hosting provider which uses a proxy (eg. Heroku),
-  // comment in the following app.set configuration command
-  //
-  // Trust first proxy, to prevent "Unable to verify authorization request state."
-  // errors with passport-auth0.
-  // Ref: https://github.com/auth0/passport-auth0/issues/70#issuecomment-480771614
-  // Ref: https://www.npmjs.com/package/express-session#cookiesecure
-  // app.set('trust proxy', 1);
-
-  sess.cookie.secure = true; // serve secure cookies, requires https
-}
-
-app.use(session(sess));
-
-app.use(passport.initialize());
-app.use(passport.session());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use(flash());
-
-// Handle auth failure error messages
-app.use(function (req, res, next) {
-  if (req && req.query && req.query.error) {
-    req.flash('error', req.query.error);
-  }
-  if (req && req.query && req.query.error_description) {
-    req.flash('error_description', req.query.error_description);
-  }
-  next();
-});
-
-app.use(userInViews());
-app.use('/', authRouter);
 app.use('/', indexRouter);
-app.use('/', usersRouter);
 
-// Catch 404 and forward to error handler
-app.use(function (req, res, next) {
-  const err = new Error('Not Found');
-  err.status = 404;
-  next(err);
-});
+Issuer.discover(process.env.OIDC_DOMAIN).then(passport_issuer => {
+  var client = new passport_issuer.Client({
+    client_id: process.env.CLIENT_ID,
+    client_secret: process.env.CLIENT_SECRET,
+    redirect_uris: [process.env.CALLBACK_URL],
+    response_types: ["code"]
+  });
 
-// Error handlers
+    app.use(
+      expressSesssion({
+        secret: 'keyboard cat',
+        resave: false,
+        saveUninitialized: true
+      })
+    );
 
-// Development error handler
-// Will print stacktrace
-if (app.get('env') === 'development') {
-  app.use(function (err, req, res, next) {
-    res.status(err.status || 500);
-    res.render('error', {
-      message: err.message,
-      error: err
+    app.use(passport.initialize());
+    app.use(passport.session());
+    app.use(flash());
+    passport.use(
+      'oidc',
+      new Strategy({ client }, (tokenSet, userinfo, done) => {
+        return done(null, tokenSet.claims());
+      })
+    );
+
+    // handles serialization and deserialization of authenticated user
+    passport.serializeUser(function(user, done) {
+      done(null, user);
+    });
+    passport.deserializeUser(function(user, done) {
+      done(null, user);
+    });
+
+    // start authentication request
+    app.get('/auth', function(req, res, next) {
+      passport.authenticate('oidc', function(err, user, info) {
+        console.log(user)
+        console.log(info)
+        if (err) {
+          return next(err); // will generate a 500 error
+        }
+        // Generate a JSON response reflecting authentication status
+        if (! user) {
+          return res.send({ success : false, message : 'authentication failed' });
+        }
+        // ***********************************************************************
+        // "Note that when using a custom callback, it becomes the application's
+        // responsibility to establish a session (by calling req.login()) and send
+        // a response."
+        // Source: http://passportjs.org/docs
+        // ***********************************************************************
+        req.login(user, loginErr => {
+          if (loginErr) {
+            return next(loginErr);
+          }
+          return res.send({ success : true, message : 'authentication succeeded' });
+        });      
+      })(req, res, next);
+    });
+
+    // authentication callback
+    app.get('/auth/callback', (req, res, next) => {
+      passport.authenticate('oidc',  function(err, user, info) {
+        console.log(user)
+        console.log(info)
+        if (err) {
+          return next(err); // will generate a 500 error
+        }
+        // Generate a JSON response reflecting authentication status
+        if (! user) {
+          return res.send({ success : false, message : 'authentication failed' });
+        }
+        // ***********************************************************************
+        // "Note that when using a custom callback, it becomes the application's
+        // responsibility to establish a session (by calling req.login()) and send
+        // a response."
+        // Source: http://passportjs.org/docs
+        // ***********************************************************************
+        req.login(user, loginErr => {
+          if (loginErr) {
+            return next(loginErr);
+          }
+          return res.send({ success : true, message : 'authentication succeeded' });
+        });      
+      })(req, res, next);
+    });
+
+    app.use('/users', usersRouter);
+
+    // start logout request
+    app.get('/logout', (req, res) => {
+      res.redirect(client.endSessionUrl());
+    });
+
+    // logout callback
+    app.get('/logout/callback', (req, res) => {
+      // clears the persisted user from the local storage
+      req.logout();
+      // redirects the user to a public route
+      res.redirect('/');
+    });
+
+
+    // catch 404 and forward to error handler
+    app.use(function(req, res, next) {
+      next(createError(404));
+    });
+
+    // error handler
+    app.use(function(err, req, res, next) {
+      // set locals, only providing error in development
+      res.locals.message = err.message;
+      res.locals.error = req.app.get('env') === 'development' ? err : {};
+
+      // render the error page
+      res.status(err.status || 500);
+      res.render('error');
     });
   });
-}
-
-// Production error handler
-// No stacktraces leaked to user
-app.use(function (err, req, res, next) {
-  res.status(err.status || 500);
-  res.render('error', {
-    message: err.message,
-    error: {}
-  });
-});
 
 module.exports = app;
