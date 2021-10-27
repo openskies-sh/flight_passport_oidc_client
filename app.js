@@ -89,8 +89,6 @@ Issuer.discover(process.env.OIDC_DOMAIN).then(passport_issuer => {
     // authentication callback
     app.get('/auth/callback', (req, res, next) => {
       passport.authenticate('oidc',  function(err, user, info) {
-        console.log(user)
-        console.log(info)
         if (err) {
           return next(err); // will generate a 500 error
         }
