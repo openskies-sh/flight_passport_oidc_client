@@ -1,11 +1,23 @@
 var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
+const crypto = require('crypto');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 const expressSesssion = require('express-session');
 const passport = require('passport');
 const { Issuer, Strategy } = require('openid-client');
+function base64URLEncode(str) {
+  return str.toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+}
+var code_verifier = base64URLEncode(crypto.randomBytes(32));
+function sha256(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest();
+}
+var code_challenge = base64URLEncode(sha256(code_verifier));
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -25,6 +37,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
 
+app.use(
+  expressSesssion({
+    secret: 'keyboard cat',
+    resave: false,
+    saveUninitialized: true
+  })
+);
 Issuer.discover(process.env.OIDC_DOMAIN).then(passport_issuer => {
   var client = new passport_issuer.Client({
     client_id: process.env.CLIENT_ID,
@@ -33,13 +52,12 @@ Issuer.discover(process.env.OIDC_DOMAIN).then(passport_issuer => {
     response_types: ["code"]
   });
 
-  app.use(
-    expressSesssion({
-      secret: 'keyboard cat',
-      resave: false,
-      saveUninitialized: true
-    })
-  );
+  client.authorizationUrl({
+    scope: 'openid profile',
+    resource: 'https://my.api.example.com/resource/32178',
+    code_challenge: code_challenge,
+    code_challenge_method: 'S256',
+  });
 
   app.use(passport.initialize());
   app.use(passport.session());
@@ -62,8 +80,6 @@ Issuer.discover(process.env.OIDC_DOMAIN).then(passport_issuer => {
     // start authentication request
     app.get('/auth', function(req, res, next) {
       passport.authenticate('oidc', function(err, user, info) {
-        console.log(user)
-        console.log(info)
         if (err) {
           return next(err); // will generate a 500 error
         }
