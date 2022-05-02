@@ -49,13 +49,13 @@ Issuer.discover(process.env.OIDC_DOMAIN).then(passport_issuer => {
     client_id: process.env.CLIENT_ID,
     client_secret: process.env.CLIENT_SECRET,
     redirect_uris: [process.env.CALLBACK_URL],
-    response_types: ["code"]
+    response_types: ["code"],
   });
 
   client.authorizationUrl({
     scope: 'openid profile',
     resource: 'https://my.api.example.com/resource/32178',
-    code_challenge: code_challenge,
+    code_challenge,
     code_challenge_method: 'S256',
   });
 
@@ -75,6 +75,9 @@ Issuer.discover(process.env.OIDC_DOMAIN).then(passport_issuer => {
   });
   passport.deserializeUser(function (user, done) {
     done(null, user);
+  });
+  app.get('/auth', function (req, res, next) {
+    passport.authenticate('oidc')(req, res, next);
   });
 
     // start authentication request
