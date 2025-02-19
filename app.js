@@ -62,7 +62,7 @@ app.get('/auth', (req, res) =>
   })
 );
 
-app.get('/custom-logout', (req, res) => res.send('Bye!'));
+
 app.use('/users', usersRouter);
 
 
