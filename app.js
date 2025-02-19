@@ -63,19 +63,6 @@ app.get('/auth', (req, res) =>
 );
 
 app.get('/custom-logout', (req, res) => res.send('Bye!'));
-
-// app.get('/auth/callback', (req, res) =>
-  
-//   res.oidc.callback({
-//     redirectUri: 'http://local.test:3000/auth/callback',
-//   })
-// );
-
-// app.post('/auth/callback', express.urlencoded({ extended: false }), (req, res) =>
-//   res.oidc.callback({
-//     redirectUri: 'http://local.test:3000/auth/callback',
-//   })
-// );
 app.use('/users', usersRouter);
 
 
