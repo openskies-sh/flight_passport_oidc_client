@@ -2,7 +2,7 @@ var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
 
-const expressSesssion = require('express-session');
+const expressSession = require('express-session');
 const { auth } = require('express-openid-connect');
 
 var indexRouter = require('./routes/index');
@@ -27,10 +27,8 @@ app.use(auth({
     response_mode: 'form_post',
     scope: 'openid profile',
   },
-
-  
   routes: {
-    login: false,    
+    login: false,
   },
 }));
 
@@ -48,7 +46,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 
 app.use(
-  expressSesssion({
+  expressSession({
     secret: 'keyboard cat',
     resave: false,
     saveUninitialized: true
@@ -68,7 +66,7 @@ app.use('/users', usersRouter);
 
 // start logout request
 app.get('/logout', (req, res) => {
-  res.redirect(client.endSessionUrl());
+  res.redirect(req.oidc.endSessionUrl());
 });
 
 // logout callback
